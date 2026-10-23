@@ -1,0 +1,183 @@
+﻿# AskHR — Agentic AI Employee Assistant
+
+AskHR is an interview-oriented demonstration prototype for an enterprise HR assistant. It combines retrieval-augmented generation (RAG), LangGraph workflow orchestration, and synthetic HR tools.
+
+> **Demo disclaimer:** This project uses fictional HR policies and synthetic employee data. It is not affiliated with or connected to Vodafone, VOIS, or any real HR system.
+
+## Features
+
+- **Policy Q&A:** Retrieves relevant policy passages from a local FAISS vector index.
+- **Grounded answers:** Uses an OpenRouter-compatible chat model to answer from retrieved policy context.
+- **Workflow routing:** LangGraph routes recognized leave-balance requests to an HR tool and other questions to the knowledge pipeline.
+- **Synthetic HR tools:** Demonstrates leave-balance lookup and leave-request validation.
+- **Human approval boundary:** Demo leave requests remain pending manager approval; the prototype does not approve leave.
+- **Source labels:** Displays the policy file and character offsets used for retrieval.
+- **Automated tests:** Covers core HR tool behavior and graph routing.
+
+## Architecture
+
+```text
+Employee
+   |
+   v
+Streamlit UI (src/app.py)
+   |
+   v
+LangGraph Router (src/agent_graph.py)
+   |
+   +--------------------------+
+   |                          |
+   v                          v
+Knowledge Node             HR Tool Node
+   |                          |
+   v                          v
+FAISS Retrieval          Synthetic HR Records
+   |
+   v
+OpenRouter Chat Model
+   |
+   v
+Grounded Answer + Sources
+```
+
+The current router uses deterministic rules for leave-balance questions. This is a controlled workflow prototype, not a fully autonomous planning agent.
+
+## Technology Stack
+
+- Python
+- Streamlit
+- LangGraph
+- LangChain
+- FAISS
+- OpenRouter-compatible chat and embedding APIs
+- pytest
+
+## Project Structure
+
+```text
+askhr-agentic-ai/
+├── data/
+│   └── hr_policies.txt
+├── src/
+│   ├── app.py
+│   ├── agent_graph.py
+│   ├── hr_tools.py
+│   ├── ingest.py
+│   └── knowledge.py
+├── tests/
+│   ├── test_agent_graph.py
+│   └── test_hr_tools.py
+├── requirements.txt
+├── .gitignore
+└── README.md
+```
+
+## Prerequisites
+
+- Python 3.11 or newer, subject to dependency compatibility
+- An OpenRouter API key
+- PowerShell on Windows, or an equivalent terminal
+
+## Setup on Windows PowerShell
+
+### 1. Clone the repository
+
+```powershell
+git clone <YOUR_GITHUB_REPOSITORY_URL>
+cd askhr-agentic-ai
+```
+
+Replace the placeholder URL with the repository URL after publishing it.
+
+### 2. Create and activate a virtual environment
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
+
+### 3. Install dependencies
+
+```powershell
+python -m pip install -r requirements.txt
+```
+
+### 4. Configure environment variables
+
+Create a local `.env` file in the project root. Do not commit this file.
+
+```dotenv
+OPENROUTER_API_KEY=your_api_key_here
+OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+OPENROUTER_CHAT_MODEL=openai/gpt-4o-mini
+OPENROUTER_EMBEDDING_MODEL=openai/text-embedding-3-small
+```
+
+Use model identifiers supported by your API provider and account.
+
+### 5. Build the local vector index
+
+```powershell
+python src\ingest.py
+```
+
+This creates the local `vectorstore` directory from `data/hr_policies.txt`. The generated index is excluded from Git and can be rebuilt.
+
+### 6. Launch AskHR
+
+```powershell
+python -m streamlit run src\app.py
+```
+
+Open the local URL printed by Streamlit.
+
+## Example Questions
+
+| Question | Expected behavior |
+|---|---|
+| How many annual leave days are available? | Retrieves the fictional policy entitlement |
+| What is my leave balance? | Reads the synthetic demo employee record |
+| What is the parental leave duration in India? | Avoids inventing details absent from the sample policy |
+| Can you approve my leave request? | Explains that manager approval is required |
+
+The policy entitlement and synthetic remaining balance are separate example values.
+
+## Run Tests
+
+```powershell
+python -m pytest -v
+```
+
+The tests cover:
+- Demo employee leave-balance lookup
+- Unknown employee handling
+- Explicit confirmation requirement in the demo tool
+- Pending manager-approval status
+- Leave-duration validation
+- LangGraph routing
+
+## Security and Limitations
+
+- The policies and employee records are fictional.
+- The prototype does not authenticate employees or integrate with a live HR platform.
+- The configured employee ID is a demo identity, not a security boundary.
+- The leave-request tool is not connected to a real transaction system.
+- LLM-generated text must not be treated as authorization for a write operation.
+- Production deployment would require identity and access management, server-side authorization, audit logging, data minimization, approval workflow integration, prompt-injection testing, retrieval evaluation, and operational monitoring.
+- The FAISS index is loaded using local pickle deserialization. Only use an index generated by a trusted process; never load an untrusted index with dangerous deserialization enabled.
+- The retrieval distance threshold is an initial demo setting and needs evaluation against a representative test set.
+
+## Roadmap
+
+Potential future enhancements include:
+- Explicit UI confirmation for leave-request submission
+- Authentication and authorization using enterprise identity
+- Retrieval and answer-quality evaluation
+- Observability for latency, errors, token usage, and retrieval quality
+- Controlled MCP tool exposure
+- Integration architecture for enterprise HR platforms
+- Optional multi-agent workflows and Google ADK / Vertex AI mapping
+
+## License
+
+No license has been added yet. Add an appropriate license before permitting reuse or redistribution.

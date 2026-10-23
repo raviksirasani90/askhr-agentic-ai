@@ -1,0 +1,23 @@
+﻿ASKHR DEMO HR POLICIES
+Version: 1.0
+Scope: Fictional policies for prototype testing only.
+
+POLICY 1: ANNUAL LEAVE
+Employees receive 24 annual leave days per calendar year in this fictional example. Leave requests require manager approval. Employees should check their individual leave balance in the HR system before submitting a request.
+
+POLICY 2: SICK LEAVE
+Employees who are unable to work due to illness should notify their manager and record their absence through the HR system. Medical documentation requirements depend on the applicable local policy.
+
+POLICY 3: PARENTAL LEAVE
+Parental leave eligibility, duration, and compensation depend on the employee's country, employment terms, and applicable local policy. Employees should consult the relevant country-specific HR policy or HR representative.
+
+POLICY 4: REMOTE WORK
+Remote work is subject to role eligibility, manager approval, and local company policy. Working from another country may require additional legal, tax, immigration, and security approvals.
+
+POLICY 5: EMPLOYEE DATA PRIVACY
+Employee personal information must only be accessed for authorised business purposes. Access must follow least-privilege principles and applicable privacy requirements. AI assistants must not disclose one employee's confidential information to another employee.
+
+POLICY 6: EXPENSE REIMBURSEMENT
+Business expenses must be submitted through the approved expense process with supporting receipts. Reimbursement is subject to applicable expense rules and approval.
+
+IMPORTANT: All policies above are fictional demonstration content and are not official Vodafone policies.
