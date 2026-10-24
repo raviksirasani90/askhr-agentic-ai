@@ -3,6 +3,15 @@ from copy import deepcopy
 from datetime import datetime, timezone
 from uuid import uuid4
 
+from src.database import (
+    add_audit_event,
+    get_leave_request_record,
+    initialize_database,
+    list_audit_events,
+    list_leave_requests,
+    save_leave_request,
+)
+
 
 DEMO_EMPLOYEES = {
     "EMP001": {
@@ -15,35 +24,32 @@ DEMO_EMPLOYEES = {
     },
 }
 
-# Demo-only manager allowlist. Production requires authenticated identity
-# and server-side role-based access control.
+# Demo-only manager allowlist; not production authentication.
 AUTHORIZED_MANAGERS = {"MGR001"}
 
-# In-memory storage: records reset when the Python process restarts.
-LEAVE_REQUESTS = {}
-AUDIT_LOG = []
+# Initialize tables when the HR module is loaded.
+initialize_database()
 
 
 def _record_audit_event(event_type: str, details: dict) -> None:
-    """Record a timestamped event for this demo session."""
-    AUDIT_LOG.append(
-        {
-            "event_id": str(uuid4()),
-            "event_type": event_type,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            **deepcopy(details),
-        }
-    )
+    """Persist a timestamped audit event."""
+    event = {
+        "event_id": str(uuid4()),
+        "event_type": event_type,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        **deepcopy(details),
+    }
+    add_audit_event(event)
 
 
 def get_audit_log() -> list:
-    """Return a copy of the demo audit log."""
-    return deepcopy(AUDIT_LOG)
+    """Return persisted audit events."""
+    return list_audit_events()
 
 
 def get_leave_request(request_id: str) -> dict:
-    """Retrieve a copy of a leave request."""
-    request = LEAVE_REQUESTS.get(request_id)
+    """Retrieve a leave request from SQLite."""
+    request = get_leave_request_record(request_id)
 
     if request is None:
         return {
@@ -51,10 +57,19 @@ def get_leave_request(request_id: str) -> dict:
             "message": "Leave request not found.",
         }
 
+    request["demo"] = bool(request["demo"])
     return {
         "success": True,
         "request": deepcopy(request),
     }
+
+
+def get_leave_requests(employee_id: str | None = None) -> list:
+    """List persisted requests, optionally for one employee."""
+    requests = list_leave_requests(employee_id)
+    for request in requests:
+        request["demo"] = bool(request["demo"])
+    return requests
 
 
 def get_leave_balance(employee_id: str) -> dict:
@@ -83,7 +98,7 @@ def submit_leave_request(
     reason: str,
     confirmed: bool = False,
 ) -> dict:
-    """Create a demo leave request after explicit employee confirmation."""
+    """Create a persistent demo request after employee confirmation."""
     if employee_id not in DEMO_EMPLOYEES:
         return {
             "success": False,
@@ -128,10 +143,8 @@ def submit_leave_request(
             "message": f"Insufficient leave balance. Available: {balance} days.",
         }
 
-    request_id = f"LR-{uuid4().hex[:10].upper()}"
-
     request = {
-        "request_id": request_id,
+        "request_id": f"LR-{uuid4().hex[:10].upper()}",
         "employee_id": employee_id,
         "days_requested": days,
         "reason": reason.strip(),
@@ -141,12 +154,12 @@ def submit_leave_request(
         "demo": True,
     }
 
-    LEAVE_REQUESTS[request_id] = request
+    save_leave_request(request)
 
     _record_audit_event(
         "LEAVE_REQUEST_SUBMITTED",
         {
-            "request_id": request_id,
+            "request_id": request["request_id"],
             "employee_id": employee_id,
             "days_requested": days,
             "status": request["status"],
@@ -166,7 +179,7 @@ def decide_leave_request(
     approved: bool,
     comments: str = "",
 ) -> dict:
-    """Approve or reject a pending request using the demo manager allowlist."""
+    """Decide a pending request using the demo manager allowlist."""
     if manager_id not in AUTHORIZED_MANAGERS:
         _record_audit_event(
             "UNAUTHORIZED_MANAGER_ATTEMPT",
@@ -192,7 +205,7 @@ def decide_leave_request(
             "message": "Manager comments must be text.",
         }
 
-    request = LEAVE_REQUESTS.get(request_id)
+    request = get_leave_request_record(request_id)
 
     if request is None:
         return {
@@ -207,10 +220,12 @@ def decide_leave_request(
         }
 
     new_status = "APPROVED" if approved else "REJECTED"
-
     request["status"] = new_status
     request["manager_id"] = manager_id
     request["manager_comments"] = comments.strip()
+    request["demo"] = bool(request["demo"])
+
+    save_leave_request(request)
 
     _record_audit_event(
         "LEAVE_REQUEST_DECIDED",

@@ -4,3 +4,5 @@ __pycache__/
 .pytest_cache/
 vectorstore/
 .streamlit/secrets.toml
+data/askhr.db
+data/askhr.db-*

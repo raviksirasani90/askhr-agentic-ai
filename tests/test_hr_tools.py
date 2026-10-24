@@ -1,9 +1,9 @@
 ﻿
 import pytest
 
+import src.database as database
+
 from src.hr_tools import (
-    AUDIT_LOG,
-    LEAVE_REQUESTS,
     decide_leave_request,
     get_audit_log,
     get_leave_balance,
@@ -13,10 +13,12 @@ from src.hr_tools import (
 
 
 @pytest.fixture(autouse=True)
-def reset_demo_state():
-    """Keep tests isolated from each other's in-memory records."""
-    LEAVE_REQUESTS.clear()
-    AUDIT_LOG.clear()
+def reset_demo_state(monkeypatch, tmp_path):
+    """Give each test an isolated temporary SQLite database."""
+    test_database = tmp_path / "askhr_test.db"
+
+    monkeypatch.setattr(database, "DATABASE_PATH", test_database)
+    database.initialize_database()
 
 
 def test_get_leave_balance_for_demo_employee():

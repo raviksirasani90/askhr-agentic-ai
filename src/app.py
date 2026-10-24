@@ -4,7 +4,7 @@ import streamlit as st
 from src.agent_graph import askhr_graph
 from src.hr_tools import (
     AUTHORIZED_MANAGERS,
-    LEAVE_REQUESTS,
+    get_leave_requests,
     decide_leave_request,
     get_audit_log,
     get_leave_balance,
@@ -146,7 +146,7 @@ with employee_tab:
 
     employee_requests = [
         request
-        for request in LEAVE_REQUESTS.values()
+        for request in get_leave_requests()
         if request["employee_id"] == DEMO_EMPLOYEE_ID
     ]
 
@@ -179,7 +179,7 @@ with manager_tab:
 
     pending_requests = [
         request
-        for request in LEAVE_REQUESTS.values()
+        for request in get_leave_requests()
         if request["status"] == "PENDING_MANAGER_APPROVAL"
     ]
 
