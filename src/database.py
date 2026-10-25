@@ -153,3 +153,70 @@ def list_audit_events():
         events.append(event)
 
     return events
+
+
+def decide_leave_request_transaction(
+    request_id: str,
+    manager_id: str,
+    new_status: str,
+    comments: str,
+    audit_event: dict,
+) -> dict:
+    """Update a leave request and record its decision atomically."""
+    details = {
+        key: value
+        for key, value in audit_event.items()
+        if key not in {"event_id", "event_type", "timestamp"}
+    }
+
+    with get_connection() as connection:
+        # Acquire the write lock before checking the request status.
+        connection.execute("BEGIN IMMEDIATE")
+
+        row = connection.execute(
+            "SELECT * FROM leave_requests WHERE request_id = ?",
+            (request_id,),
+        ).fetchone()
+
+        if row is None:
+            return {"success": False, "message": "Leave request not found."}
+
+        if row["status"] != "PENDING_MANAGER_APPROVAL":
+            return {
+                "success": False,
+                "message": "This request has already received a decision.",
+            }
+
+        connection.execute(
+            """
+            UPDATE leave_requests
+            SET status = ?, manager_id = ?, manager_comments = ?
+            WHERE request_id = ?
+            """,
+            (new_status, manager_id, comments, request_id),
+        )
+
+        connection.execute(
+            """
+            INSERT INTO audit_events (
+                event_id, event_type, timestamp, details_json
+            )
+            VALUES (?, ?, ?, ?)
+            """,
+            (
+                audit_event["event_id"],
+                audit_event["event_type"],
+                audit_event["timestamp"],
+                json.dumps(details),
+            ),
+        )
+
+        updated_row = connection.execute(
+            "SELECT * FROM leave_requests WHERE request_id = ?",
+            (request_id,),
+        ).fetchone()
+
+        return {
+            "success": True,
+            "request": dict(updated_row),
+        }

@@ -5,6 +5,7 @@ from uuid import uuid4
 
 from src.database import (
     add_audit_event,
+    decide_leave_request_transaction,
     get_leave_request_record,
     initialize_database,
     list_audit_events,
@@ -173,13 +174,14 @@ def submit_leave_request(
     }
 
 
+
 def decide_leave_request(
     request_id: str,
     manager_id: str,
     approved: bool,
     comments: str = "",
 ) -> dict:
-    """Decide a pending request using the demo manager allowlist."""
+    """Decide a pending request and persist its audit event atomically."""
     if manager_id not in AUTHORIZED_MANAGERS:
         _record_audit_event(
             "UNAUTHORIZED_MANAGER_ATTEMPT",
@@ -205,37 +207,32 @@ def decide_leave_request(
             "message": "Manager comments must be text.",
         }
 
-    request = get_leave_request_record(request_id)
-
-    if request is None:
-        return {
-            "success": False,
-            "message": "Leave request not found.",
-        }
-
-    if request["status"] != "PENDING_MANAGER_APPROVAL":
-        return {
-            "success": False,
-            "message": "This request has already received a decision.",
-        }
-
     new_status = "APPROVED" if approved else "REJECTED"
-    request["status"] = new_status
-    request["manager_id"] = manager_id
-    request["manager_comments"] = comments.strip()
-    request["demo"] = bool(request["demo"])
+    clean_comments = comments.strip()
 
-    save_leave_request(request)
+    audit_event = {
+        "event_id": str(uuid4()),
+        "event_type": "LEAVE_REQUEST_DECIDED",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "request_id": request_id,
+        "manager_id": manager_id,
+        "decision": new_status,
+        "comments": clean_comments,
+    }
 
-    _record_audit_event(
-        "LEAVE_REQUEST_DECIDED",
-        {
-            "request_id": request_id,
-            "manager_id": manager_id,
-            "decision": new_status,
-            "comments": comments.strip(),
-        },
+    result = decide_leave_request_transaction(
+        request_id=request_id,
+        manager_id=manager_id,
+        new_status=new_status,
+        comments=clean_comments,
+        audit_event=audit_event,
     )
+
+    if not result["success"]:
+        return result
+
+    request = result["request"]
+    request["demo"] = bool(request["demo"])
 
     return {
         "success": True,

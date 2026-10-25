@@ -1,6 +1,5 @@
-﻿
+﻿import sqlite3
 import pytest
-
 import src.database as database
 
 from src.hr_tools import (
@@ -166,3 +165,45 @@ def test_invalid_decision_type_is_rejected():
     assert get_leave_request(submitted["request_id"])["request"]["status"] == (
         "PENDING_MANAGER_APPROVAL"
     )
+
+
+def test_decision_rolls_back_if_audit_insert_fails():
+    request = submit_leave_request(
+        "EMP001",
+        2,
+        "Transaction rollback test",
+        confirmed=True,
+    )
+    request_id = request["request_id"]
+
+    # Reserve an audit event ID so the decision's audit insert conflicts.
+    duplicate_event = {
+        "event_id": "duplicate-test-event",
+        "event_type": "TEST_EVENT",
+        "timestamp": "2026-01-01T00:00:00+00:00",
+        "request_id": request_id,
+    }
+    database.add_audit_event(duplicate_event)
+
+    audit_event = {
+        "event_id": "duplicate-test-event",
+        "event_type": "LEAVE_REQUEST_DECIDED",
+        "timestamp": "2026-01-01T00:01:00+00:00",
+        "request_id": request_id,
+        "manager_id": "MGR001",
+        "decision": "APPROVED",
+        "comments": "",
+    }
+
+    with pytest.raises(sqlite3.IntegrityError):
+        database.decide_leave_request_transaction(
+            request_id=request_id,
+            manager_id="MGR001",
+            new_status="APPROVED",
+            comments="",
+            audit_event=audit_event,
+        )
+
+    saved_request = get_leave_request(request_id)
+    assert saved_request["success"] is True
+    assert saved_request["request"]["status"] == "PENDING_MANAGER_APPROVAL"
